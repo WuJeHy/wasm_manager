@@ -3,15 +3,14 @@
  */
 
 // 用于计时的函数
-
-use std::borrow::Borrow;
+#[allow(unused_parens)]
 
 use tracing::debug;
-use wasmer::{AsStoreMut, Memory, MemoryView};
+use wasmer::{AsStoreMut, MemoryView};
 use crate::error::TrekWasmError;
 use crate::runtime::TrekAbiEnv;
-
-fn trace_call_time<CTX, RETURN, ERR>(ctx: CTX, callback: impl Fn(CTX) -> anyhow::Result<RETURN, ERR>)
+#[allow(dead_code)]
+pub fn trace_call_time<CTX, RETURN, ERR>(ctx: CTX, callback: impl Fn(CTX) -> anyhow::Result<RETURN, ERR>)
                                          -> anyhow::Result<RETURN, ERR> {
     let time_start = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
     let ret = callback(ctx);

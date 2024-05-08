@@ -4,5 +4,7 @@
 pub mod error;
 pub mod runtime;
 pub mod manger;
+
+pub mod app;
 pub mod abi;
 pub mod tools;

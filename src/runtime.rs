@@ -5,26 +5,52 @@
 use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
-use tracing::{debug, info};
 
-use wasmer::{AsStoreMut, Function, FunctionEnv, Imports, imports, Instance, Module, Store, TypedFunction};
-use crate::abi;
+use tracing::{debug, info};
+use wasmer::{AsStoreMut, FunctionEnv, Imports, imports, Instance, Module, Store, TypedFunction};
+
 use crate::abi::demo_abi;
 use crate::error::TrekWasmError;
 
-#[derive(Clone , Default)]
+#[allow(dead_code)]
+#[derive(Clone, Default)]
 pub struct TrekAbiEnv<T> {
     pub ins: Arc<Mutex<Option<Instance>>>,
     // 这个是后期用来储存 上下文的 具体这里并没有使用
     ctx: T,
+    // 标记实例的id
+    app_id: Arc<Mutex<Option<u64>>>,
 }
+
 
 impl<T> TrekAbiEnv<T> {
     pub fn new(t: T) -> Self {
         TrekAbiEnv {
             ctx: t,
             ins: Arc::new(Mutex::new(None)),
+            app_id: Arc::new(Mutex::new(None)),
         }
+    }
+
+    pub fn update_id(&self, id: &u64) -> anyhow::Result<(), TrekWasmError> {
+        let mut get_lock = self.app_id
+            .lock()
+            .ok()
+            .ok_or(TrekWasmError::UnknownErrFail)?;
+        *get_lock = Some(id.clone());
+
+        Ok(())
+    }
+
+    pub fn get_id(&self) -> anyhow::Result<u64, TrekWasmError> {
+        self.app_id
+            .clone()
+            .lock()
+            .map_err(|_err| {
+                TrekWasmError::UnknownErrFail
+            })?
+            .clone()
+            .ok_or(TrekWasmError::UnknownErrFail)
     }
 }
 
@@ -42,8 +68,9 @@ impl Drop for TrekFunctionEnv {
         let arc_count = Arc::strong_count(&self.store_raw);
 
         if arc_count == 1 {
-            let _from_box = unsafe { Box::from_raw(*self.store_raw) };
-            info!("drop TrekFunctionEnv store_raw ");
+            let from_box = unsafe { Box::from_raw(*self.store_raw) };
+            let id = from_box.id();
+            info!("drop TrekFunctionEnv store_raw {id}" , );
         }
     }
 }
@@ -157,10 +184,8 @@ impl TrekFunctionEnv {
     }
 
 
-
-
     pub async fn test_call_api<ARGS, RETURN>(&self, instance: &Instance, store: &mut impl AsStoreMut, api_path: &str, args: ARGS)
-                                        -> anyhow::Result<RETURN, TrekWasmError>
+                                             -> anyhow::Result<RETURN, TrekWasmError>
         where ARGS: wasmer::FromToNativeWasmType,
               RETURN: wasmer::FromToNativeWasmType
     {
